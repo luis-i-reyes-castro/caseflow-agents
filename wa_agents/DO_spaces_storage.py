@@ -172,7 +172,7 @@ class DOSpacesBucket :
             msg_bm = msg_dict.get("basemodel")
             if msg_bm and isinstance( msg_bm, str) :
                 
-                import basemodels
+                from . import basemodels
                 MsgBM = getattr( basemodels, msg_bm, None)
                 
                 if MsgBM and issubclass( MsgBM, BaseModel) :
