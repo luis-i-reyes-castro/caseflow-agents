@@ -6,6 +6,7 @@ from abc import ( ABC,
                   abstractmethod )
 from decimal import Decimal
 from pydantic import ( BaseModel,
+                       ConfigDict,
                        Field,
                        model_validator,
                        ValidationError )
@@ -49,20 +50,28 @@ class InteractiveOption(BaseModel) :
 
 class WhatsAppContext(BaseModel) :
     
-    # Message is a reply to a previous message
+    model_config = ConfigDict( frozen = True)
+    
+    # Fields below present only if message is a reply
     user : NE_str | None = Field( alias = "from", default = None)
-    id   : NE_str | None = None
-    # Message was forwarded
+    id   : NE_str | None = None # ID of message being replied to
+    
+    # Fields below present only if message was forwarded
     forwarded            : bool | None = None
     frequently_forwarded : bool | None = None
-    # Message refers to a product in the catalog
+    
+    # Field below present only if message refers to a catalog product
     referred_product : dict[ str, str] | None = None
 
 class WhatsAppText(BaseModel) :
     
+    model_config = ConfigDict( frozen = True)
+    
     body : NE_str
 
 class WhatsAppInteractiveReply(BaseModel) :
+    
+    model_config = ConfigDict( frozen = True)
     
     type         : Literal[ "button_reply", "list_reply"]
     button_reply : InteractiveOption | None = None
@@ -91,6 +100,8 @@ class WhatsAppInteractiveReply(BaseModel) :
 
 class WhatsAppMediaData(BaseModel) :
     
+    model_config = ConfigDict( frozen = True)
+    
     id        : NE_str
     mime_type : NE_str
     sha256    : NE_str
@@ -108,11 +119,15 @@ class WhatsAppMediaData(BaseModel) :
 
 class WhatsAppReaction(BaseModel) :
     
+    model_config = ConfigDict( frozen = True)
+    
     message_id : NE_str
     emoji      : str | None = None
 
 class WhatsAppMsg(BaseModel) :
-
+    
+    model_config = ConfigDict( frozen = True)
+    
     context   : WhatsAppContext | None = None
     
     user      : NE_str = Field( alias = "from") # Sender Phone Number
@@ -129,6 +144,8 @@ class WhatsAppMsg(BaseModel) :
                          "contacts",
                          "location" ]
     
+    # In a WhatsApp message only one of the fields below will be present
+    # (more precisely, the field that matches the message `type`).
     text        : WhatsAppText             | None = None
     interactive : WhatsAppInteractiveReply | None = None
     image       : WhatsAppMediaData        | None = None
@@ -167,43 +184,57 @@ class WhatsAppMsg(BaseModel) :
 
 class WhatsAppProfile(BaseModel) :
     
+    model_config = ConfigDict( frozen = True)
+    
     name : NE_str
 
 class WhatsAppContact(BaseModel) :
     
-    wa_id   : NE_str
+    model_config = ConfigDict( frozen = True)
+    
+    wa_id   : NE_str # Sender Phone Number
     profile : WhatsAppProfile | None = None
 
 # PAYLOADS
 
 class WhatsAppMetaData(BaseModel) :
     
+    model_config = ConfigDict( frozen = True)
+    
     display_phone_number : NE_str # Receiver Phone Number
     phone_number_id      : NE_str # Receiver WhatsApp Number ID
 
 class WhatsAppValue(BaseModel) :
     
+    model_config = ConfigDict( frozen = True)
+    
     messaging_product : NE_str = "whatsapp"
     
     metadata : WhatsAppMetaData
-    contacts : list[WhatsAppContact]
-    messages : list[WhatsAppMsg]
+    contacts : tuple[ WhatsAppContact, ...]
+    messages : tuple[ WhatsAppMsg, ...]
 
 class WhatsAppChange_(BaseModel) :
+    
+    model_config = ConfigDict( frozen = True)
     
     value : WhatsAppValue
     field : NE_str = "messages"
 
 class WhatsAppChanges(BaseModel) :
     
+    model_config = ConfigDict( frozen = True)
+    
     id      : NE_str # Receiver WABA Number
-    changes : list[WhatsAppChange_]
+    changes : tuple[ WhatsAppChange_, ...]
 
 class WhatsAppPayload(BaseModel) :
     
+    model_config = ConfigDict( frozen = True)
+    
     title : NE_str = Field( alias   = "object",
                             default = "whatsapp_business_account")
-    entry : list[WhatsAppChanges]
+    entry : tuple[ WhatsAppChanges, ...]
 
 # =========================================================================================
 # CASEFLOW BASEMODELS
