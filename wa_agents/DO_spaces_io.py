@@ -2,12 +2,12 @@
 Digital Ocean Spaces S3 Bucket: Input/Output (IO) Functions
 """
 
+import os
+
 from boto3 import client as boto3_client
 from botocore.config import Config
 from botocore.exceptions import ClientError
-from dotenv import load_dotenv
 from io import BytesIO
-from os import getenv
 from pathlib import Path
 from typing import Any
 
@@ -16,11 +16,10 @@ from sofia_utils.io import write_to_json_string
 
 # =========================================================================================
 
-DOT_ENV_RESULT    = load_dotenv()
-BUCKET_REGION     = getenv("SPACES_REGION")
-BUCKET_KEY        = getenv("SPACES_KEY_ID")
-BUCKET_KEY_SECRET = getenv("SPACES_KEY_SECRET")
-BUCKET_NAME       = getenv("SPACES_BUCKET")
+BUCKET_REGION     = os.getenv("SPACES_REGION")
+BUCKET_KEY        = os.getenv("SPACES_KEY_ID")
+BUCKET_KEY_SECRET = os.getenv("SPACES_KEY_SECRET")
+BUCKET_NAME       = os.getenv("SPACES_BUCKET")
 
 boto3_client_args = \
     { 

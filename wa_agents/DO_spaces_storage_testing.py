@@ -14,10 +14,7 @@ from .DO_spaces_storage import *
 
 def check_environment_variables() -> None :
     
-    print("=== Checking Environment Variables ===\n")
-    
-    # Load environment variables
-    print(f"load_dotenv() returned: {DOT_ENV_RESULT}")
+    print("=== Checking Environment Variables ===")
     
     # Check each variable
     variables = { "BUCKET_REGION"    : BUCKET_REGION,

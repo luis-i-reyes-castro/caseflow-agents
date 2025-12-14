@@ -5,7 +5,6 @@ Agent Class
 import os
 
 from base64 import b64encode
-from dotenv import load_dotenv
 from mistralai import Mistral
 from openai import OpenAI
 from pydantic import BaseModel
@@ -65,7 +64,6 @@ class Agent :
         self.client = None
         self.model  = None
         self.model_fallbacks : list[str] = []
-        load_dotenv()
         
         # Case: Single provider (Anthropic, Mistral, OpenAI)
         if isinstance( models, str) :

@@ -4,7 +4,6 @@ import os
 import re
 import requests
 
-from dotenv import load_dotenv
 from typing import Any
 
 from sofia_utils.printing import print_sep
@@ -15,9 +14,8 @@ from .basemodels import ( OutgoingMediaMsg,
 
 
 # -----------------------------------------------------------------------------------------
-# ENVIRONMENT VARIABLES
+# CONSTANTS AND ENVIRONMENT VARIABLES
 
-load_dotenv()
 API_URL  = "https://graph.facebook.com/v23.0/"
 WA_TOKEN = os.getenv("WA_TOKEN")
 

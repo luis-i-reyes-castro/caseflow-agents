@@ -8,7 +8,6 @@ import logging
 import os
 import time
 
-from dotenv import load_dotenv
 from traceback import format_exc
 from typing import Type
 
@@ -21,7 +20,6 @@ from .queue_db import QueueDB
 from .whatsapp_functions import fetch_media
 
 
-load_dotenv()
 POLL_INTERVAL_BUSY = float( os.getenv( "QUEUE_POLL_INTERVAL_BUSY", 0.2))
 POLL_INTERVAL_IDLE = float( os.getenv( "QUEUE_POLL_INTERVAL_IDLE", 1.0))
 RESPONSE_DELAY     = float( os.getenv( "QUEUE_RESPONSE_DELAY",     1.0))
