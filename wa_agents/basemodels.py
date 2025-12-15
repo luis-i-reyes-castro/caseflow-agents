@@ -50,7 +50,8 @@ class InteractiveOption(BaseModel) :
 
 class WhatsAppContext(BaseModel) :
     
-    model_config = ConfigDict( frozen = True)
+    model_config = ConfigDict( frozen           = True,
+                               populate_by_name = True)
     
     # Fields below present only if message is a reply
     user : NE_str | None = Field( alias = "from", default = None)
@@ -126,7 +127,8 @@ class WhatsAppReaction(BaseModel) :
 
 class WhatsAppMsg(BaseModel) :
     
-    model_config = ConfigDict( frozen = True)
+    model_config = ConfigDict( frozen           = True,
+                               populate_by_name = True)
     
     context   : WhatsAppContext | None = None
     

@@ -77,7 +77,7 @@ class QueueDB :
                     VALUES (?)
                     ON CONFLICT (payload) DO NOTHING
                     """,
-                    (payload.model_dump_json(),),
+                    (payload.model_dump_json(by_alias = True),),
                 )
                 return conn.total_changes > 0
             
