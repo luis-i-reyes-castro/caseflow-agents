@@ -7,20 +7,24 @@ from copy import deepcopy
 from datetime import ( datetime,
                        timezone,
                        timedelta )
+from inspect import currentframe
 
 from sofia_utils.stamps import *
-from sofia_utils.io import ( JSON_INDENT,
-                             write_to_json_string )
+from sofia_utils.io import write_to_json_string
 
 from .basemodels import ( AssistantMsg,
                           CaseIndex,
                           CaseManifest,
+                          MediaData,
                           MediaContent,
                           Message,
                           ServerInteractiveOptsMsg,
                           ServerTextMsg,
                           ToolResultsMsg,
+                          UserContentMsg,
                           UserData,
+                          UserInteractiveReplyMsg,
+                          UserMsg,
                           WhatsAppContact,
                           WhatsAppMetaData,
                           WhatsAppMsg )
@@ -45,12 +49,14 @@ class CaseHandlerBase(ABC) :
     
     def __init__( self,
                   operator : WhatsAppMetaData,
-                  user     : WhatsAppContact ) -> None :
+                  user     : WhatsAppContact,
+                  debug    : bool = False ) -> None :
         
         self.operator_num = operator.display_phone_number
         self.operator_id  = operator.phone_number_id
         self.user_id      = user.wa_id
         self.user_name    = user.profile.name
+        self.debug        = debug
         
         self.user_data     : UserData      = None
         self.case_id       : int           = None
@@ -174,19 +180,6 @@ class CaseHandlerBase(ABC) :
         
         return
     
-    def case_set_drone_model( self, drone_model : str | None) -> None :
-        """
-        Set current case drone model
-        Args:
-            drone_model: 'T40' | 'T50'
-        """
-        if drone_model and isinstance( drone_model, str) and \
-           drone_model in self.tool_server.dkdb.MODELS_AVAILABLE :
-            self.case_manifest.model = drone_model
-            self.storage.manifest_write(self.case_manifest)
-        
-        return
-    
     def case_set_open_case_id( self, case_id : int | None) -> None :
         """
         Set open case ID
@@ -204,9 +197,9 @@ class CaseHandlerBase(ABC) :
     # CONTEXT
     # =====================================================================================
     
-    def context_build( self, truncate : bool = True, debug : bool = False) -> None :
+    def context_build( self, truncate : bool = True) -> None :
         """
-        Build context
+        Build context\n
         Args:
             truncate: Whether or not to enforce the max content length
             debug:    Debug mode flag
@@ -215,11 +208,6 @@ class CaseHandlerBase(ABC) :
         # Ensure we know which case to load
         if not ( self.case_id and self.case_manifest ) :
             self.case_id, self.case_manifest = self.case_decide()
-        
-        # Initialize DKDB
-        if self.case_manifest and self.case_manifest.model \
-                              and ( not self.tool_server.dkdb.model ) :
-            self.tool_server.dkdb.set_model(self.case_manifest.model)
         
         # Get messages in manifest
         self.case_context = []
@@ -236,49 +224,18 @@ class CaseHandlerBase(ABC) :
         if truncate and ( len(self.case_context) > self.MAX_CONTEXT_LEN ) :
             self.case_context = self.case_context[ -self.MAX_CONTEXT_LEN : ]
         
-        # Scan for triggers
-        self.triggers = self.state_machine.process( self.case_context, debug)
-        
         # The grand finale
         return
     
-    def context_print(self) -> str :
-        """
-        Generate a formatted string representation of the current case context.
-        Returns:
-            str: Formatted string with user ID and message details
-        """
-        if not self.case_id :
-            self.case_id, self.case_manifest = self.case_decide()
-        
-        self.context_build( truncate = False)
-        
-        # Build the output string
-        output = []
-        output.append("USER DATA")
-        output.append(self.user_data.model_dump_json( indent = JSON_INDENT))
-        output.append("CONTEXT:")
-        for i, msg in enumerate( self.case_context, 1) :
-            output.append(f"MESSAGE {i}:")
-            output.append(msg.model_dump_json( indent = JSON_INDENT))
-        
-        return "\n".join(output)
-    
-    def context_update( self,
-                        message  : Message,
-                        triggers : bool = True,
-                        debug    : bool = False ) -> None :
+    def context_update( self, message : Message) -> None :
         """
         Update context:
         * Write message to storage
-        * Append message to case manifest and re-write manifest to storage
-        * If the case context has been initialized then append message
-        * If requested then update triggers
-        
+        * Append message to case manifest and re-write manifest
+        * If the case context has been initialized then append message\n
         Args:
-            message:  Instance of a subclass of Message
-            triggers: Whether or not to update triggers
-            debug :   Debug mode flag
+            message: Instance of a subclass of Message
+            debug :  Debug mode flag
         """
         
         # Get user store and lock it
@@ -294,23 +251,82 @@ class CaseHandlerBase(ABC) :
         if self.case_context :
             self.case_context.append(message)
         
-        # Update triggers
-        if triggers :
-            self.triggers = self.state_machine.update( message, debug)
-        
         return
+    
+    # =====================================================================================
+    # MESSAGE DEDUP AND INGESTION
+    # =====================================================================================
+    
+    def dedup_and_ingest_message( self,
+                                  message       : WhatsAppMsg,
+                                  media_content : MediaContent | None = None,
+                                ) -> UserMsg | None :
+        """
+        Deduplicate and ingest a WhatsApp message
+        """
+        _orig_ = f"{self.__class__.__name__}/{currentframe().f_code.co_name}"
+        
+        # If message already processed then return None
+        if self.storage.dedup_exists(message.id) :
+            return None
+        
+        # Determine target case_id
+        self.case_id, self.case_manifest = self.case_decide()
+        
+        # Process text or media
+        msg = None
+        if message.text or message.media_data :
+            
+            text       = None
+            media_data = None
+            if message.text :
+                text = message.text.body
+            elif message.media_data :
+                text       = message.media_data.caption
+                media_data = MediaData.from_content(media_content)
+            
+            msg = UserContentMsg(
+                    origin          = _orig_,
+                    case_id         = self.case_id,
+                    idempotency_key = message.id,
+                    time_created    = unix_to_utc_iso(message.timestamp),
+                    text            = text,
+                    media           = media_data )
+            msg.print()
+        
+        # Process Interactive Reply Message
+        elif message.interactive :
+            
+            msg = UserInteractiveReplyMsg(
+                    origin          = _orig_,
+                    case_id         = self.case_id,
+                    idempotency_key = message.id,
+                    time_created    = unix_to_utc_iso(message.timestamp),
+                    choice          = message.interactive.choice )
+            msg.print()
+        
+        if msg :
+            # Write message to storage and update manifest
+            self.context_update(msg)
+            # Write message media to storage
+            if isinstance( msg, UserContentMsg) and msg.media :
+                with self.DirLock(self.user_root) :
+                    self.storage.media_write( msg, media_content)
+        
+        # The grand finale
+        return msg
     
     # =====================================================================================
     # MESSAGE SENDING FUNCTIONS
     # =====================================================================================
     
     def send_text( self,
-                   message : ServerTextMsg | AssistantMsg | ToolResultsMsg,
-                   debug   : bool = False ) -> bool :
+                   message : ServerTextMsg | AssistantMsg | ToolResultsMsg
+                 ) -> bool :
         
         try :
             # If not in debug mode: Send only Assistant Message text
-            if not debug :
+            if not self.debug :
                 if isinstance( message, ( ServerTextMsg, AssistantMsg)) \
                 and message.text :
                     send_whatsapp_text( self.operator_id, self.user_id, message.text)
@@ -346,13 +362,11 @@ class CaseHandlerBase(ABC) :
         
         return False
     
-    def send_interactive( self,
-                          message : ServerInteractiveOptsMsg,
-                          debug   : bool = False ) -> bool :
+    def send_interactive( self, message : ServerInteractiveOptsMsg) -> bool :
         
         if isinstance( message, ServerInteractiveOptsMsg) :
             try :
-                if not debug :
+                if not self.debug :
                     send_whatsapp_interactive( self.operator_id, self.user_id, message)
                 else :
                     message_cp      = deepcopy(message)
@@ -372,17 +386,31 @@ class CaseHandlerBase(ABC) :
     # =====================================================================================
     
     @abstractmethod
-    def process_msg_human( self,
-                           message       : WhatsAppMsg,
-                           media_content : MediaContent | None = None
-                         ) -> bool :
+    def process_message( self,
+                         message       : WhatsAppMsg,
+                         media_content : MediaContent | None = None
+                       ) -> bool :
+        """
+        Process WhatsApp message\n
+        Args:
+            message:       WhatsApp message object
+            media_content: If WhatsApp message is a media message then use this field to pass the media content
+        Returns:
+            True if message needs to be replied to, False otherwise.
+        """
         
         raise NotImplementedError
     
     @abstractmethod
     def generate_response( self,
-                           max_tokens : int | None = None,
-                           debug      : bool       = False
+                           max_tokens : int | None = None
                          ) -> bool :
+        """
+        Generate response\n
+        Args:
+            max_tokens: Optional maximum number of input+output tokens
+        Returns:
+            bool: True if need to generate more responses, False otherwise.
+        """
         
         raise NotImplementedError

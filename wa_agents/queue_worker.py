@@ -116,7 +116,7 @@ class QueueWorker :
                                 media_content = MediaContent( mime    = mime_type,
                                                               content = media_bytes)
                             
-                            respond = handler.process_msg_human( msg, media_content) \
+                            respond = handler.process_message( msg, media_content) \
                                       or respond
                         
                         if respond :
@@ -143,7 +143,7 @@ class QueueWorker :
                 handler  = self.handler_cls( operator, user)
                 respond  = True
                 while respond :
-                    respond = handler.generate_response( debug = False)
+                    respond = handler.generate_response()
                 
                 self._job_td.mark_as_done(( operator, user))
                 processed_jobs = True
