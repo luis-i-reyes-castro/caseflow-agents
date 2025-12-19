@@ -5,6 +5,8 @@ BaseModel Classes
 from abc import ( ABC,
                   abstractmethod )
 from decimal import Decimal
+from mimetypes import guess_type
+from pathlib import Path
 from pydantic import ( BaseModel,
                        ConfigDict,
                        Field,
@@ -389,6 +391,25 @@ class MediaData(MediaBase) :
                     mime   = media_content.mime,
                     sha256 = get_sha256(media_content.content),
                     size   = len(media_content.content) )
+
+def load_media( path : str | Path) -> tuple[ MediaData, MediaContent] :
+    
+    media_path = Path(path)
+    media_mime = guess_type(media_path.name)[0]
+    media_cont = media_path.read_bytes()
+    
+    if not ( media_mime and media_cont ) :
+        return None, None
+    
+    md_obj = MediaData( mime   = media_mime,
+                        name   = media_path.name,
+                        sha256 = get_sha256(media_cont),
+                        size   = len(media_cont))
+    
+    mc_obj = MediaContent( mime    = media_mime,
+                           content = media_cont)
+    
+    return md_obj, mc_obj
 
 class OutgoingMediaMsg(MediaBase) :
     """
