@@ -21,6 +21,7 @@ dependencies = [
   "pydantic>=2.12.5",
   "requests>=2.32.5",
   "sofia-utils>=1.0.0",
+  "transitions>=0.9.3",
 ]
 
 [tool.setuptools.packages.find]

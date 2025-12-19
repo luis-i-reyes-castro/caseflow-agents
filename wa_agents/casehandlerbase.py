@@ -8,6 +8,7 @@ from datetime import ( datetime,
                        timezone,
                        timedelta )
 from inspect import currentframe
+from typing import Type
 
 from sofia_utils.stamps import *
 from sofia_utils.io import write_to_json_string
@@ -30,6 +31,7 @@ from .basemodels import ( AssistantMsg,
                           WhatsAppMsg )
 from .do_bucket_storage import DOBucketStorage
 from .do_bucket_lock import DOBucketLock
+from .statemachinebase import StateMachineBase
 from .whatsapp_functions import ( send_whatsapp_text,
                                   send_whatsapp_interactive)
 
@@ -68,6 +70,8 @@ class CaseHandlerBase(ABC) :
         
         self.user_root = self.storage.dir_user()
         self.user_data_lookup()
+        
+        self.state_machine : Type[StateMachineBase] = None
         
         return
     
@@ -224,6 +228,12 @@ class CaseHandlerBase(ABC) :
         if truncate and ( len(self.case_context) > self.MAX_CONTEXT_LEN ) :
             self.case_context = self.case_context[ -self.MAX_CONTEXT_LEN : ]
         
+        # Feed context to state machine
+        if self.state_machine :
+            self.state_machine.reset()
+            for message in self.case_context :
+                self.state_machine.ingest_message(message)
+        
         # The grand finale
         return
     
@@ -250,6 +260,10 @@ class CaseHandlerBase(ABC) :
         # Update context
         if self.case_context :
             self.case_context.append(message)
+        
+        # Update state machine
+        if self.state_machine :
+            self.state_machine.ingest_message(message)
         
         return
     

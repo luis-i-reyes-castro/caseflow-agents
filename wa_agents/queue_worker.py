@@ -29,10 +29,6 @@ type HandlerJob = tuple[ WhatsAppMetaData, WhatsAppContact]
 
 class JobTimeDict( dict[ HandlerJob, float] ) :
     
-    def mark_as_done( self, job : HandlerJob) -> None :
-        self.pop( job, 0.0)
-        return
-    
     def get_due_now(self) -> list[HandlerJob] :
         
         result = []
@@ -41,6 +37,10 @@ class JobTimeDict( dict[ HandlerJob, float] ) :
                 result.append(handlerjob)
         
         return result
+    
+    def mark_as_done( self, job : HandlerJob) -> None :
+        self.pop( job, 0.0)
+        return
 
 
 class QueueWorker :
