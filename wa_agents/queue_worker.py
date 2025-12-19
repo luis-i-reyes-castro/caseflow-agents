@@ -15,7 +15,7 @@ from .basemodels import ( MediaContent,
                           WhatsAppContact,
                           WhatsAppMetaData,
                           WhatsAppPayload )
-from .casehandlerbase import CaseHandlerBase
+from .case_handler_base import CaseHandlerBase
 from .queue_db import QueueDB
 from .whatsapp_functions import fetch_media
 

@@ -31,7 +31,7 @@ from .basemodels import ( AssistantMsg,
                           WhatsAppMsg )
 from .do_bucket_storage import DOBucketStorage
 from .do_bucket_lock import DOBucketLock
-from .statemachinebase import StateMachineBase
+from .state_machine_base import StateMachineBase
 from .whatsapp_functions import ( send_whatsapp_text,
                                   send_whatsapp_interactive)
 
