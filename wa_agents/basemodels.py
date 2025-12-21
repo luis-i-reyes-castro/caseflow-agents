@@ -18,11 +18,12 @@ from typing import ( Annotated,
                      Self )
 
 from sofia_utils.io import JSON_INDENT
-from sofia_utils.phone_numbers import get_country_and_language
 from sofia_utils.printing import print_sep
 from sofia_utils.stamps import ( generate_UUID,
                                  get_now_utc_iso,
                                  get_sha256 )
+
+from .phone_numbers import get_country_and_language
 
 
 # =========================================================================================
