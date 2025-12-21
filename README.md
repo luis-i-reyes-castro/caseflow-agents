@@ -2,9 +2,28 @@
 
 A Python API for my WhatsApp chatbot apps
 
-## Environment Variables
+## Installation
 
-The following subsections list the env vars that need to be in an app's `.env` file for it to work with `wa-agents`.
+### As an Editable Package
+
+```bash
+git clone https://github.com/luis-i-reyes-castro/wa-agents.git
+pip install -e wa-agents/
+```
+
+### As a Dependency
+
+Add this line to your `requirements.txt`:
+```bash
+wa-agents @ git+https://github.com/luis-i-reyes-castro/wa-agents.git@main
+```
+
+Re-run `pip`:
+```bash
+pip install -r requirements.txt
+```
+
+## Required Environment Variables
 
 ### Digital Ocean Spaces S3 Bucket
 
