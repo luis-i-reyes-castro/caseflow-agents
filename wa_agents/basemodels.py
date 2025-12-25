@@ -18,7 +18,8 @@ from typing import ( Annotated,
                      Self )
 
 from sofia_utils.io import JSON_INDENT
-from sofia_utils.printing import print_sep
+from sofia_utils.printing import ( print_ind,
+                                   print_sep )
 from sofia_utils.stamps import ( generate_UUID,
                                  get_now_utc_iso,
                                  get_sha256 )
@@ -659,3 +660,25 @@ class CaseManifest(BaseModel) :
     time_last_message : NE_str | None = None
     time_closed       : NE_str | None = None
     message_ids       : Annotated[ list[NE_str], Field( default_factory = list)]
+
+# =========================================================================================
+# VALIDATION ERROR PRINTING
+# =========================================================================================
+
+def print_validation_errors( validation_error : ValidationError,
+                             indent           : int = JSON_INDENT) -> None :
+    
+    for error in validation_error.errors() :
+        
+        location_raw = error.get( "loc", ())
+        if location_raw :
+            location = " -> ".join( str(part) for part in location_raw )
+        else :
+            location = "<root>"
+        
+        message = error.get( "msg", "Validation error")
+        
+        print_ind( f"Location : {location}", indent)
+        print_ind( f"Message  : {message}",  indent)
+    
+    return
