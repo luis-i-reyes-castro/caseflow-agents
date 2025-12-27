@@ -285,8 +285,7 @@ class Message( BaseModel, ABC) :
     Message abstract base class. Must implement abstract property `role`.
     {
     "basemodel"       : "<class name (for deserialization)>"
-    "origin"          : "CaseHandler/<method>"
-    "case_id"         : <case ID>,
+    "origin"          : "<optional field for tracking purposes>" | null
     "idempotency_key" : "<provider message ID>",
     "time_created"    : "<timestamp>"
     "time_received"   : "<timestamp>"
@@ -294,8 +293,7 @@ class Message( BaseModel, ABC) :
     }
     """
     basemodel       : NE_str | None = None
-    origin          : NE_str
-    case_id         : NN_int
+    origin          : NE_str | None = None
     idempotency_key : NE_str = Field( default_factory = generate_UUID)
     time_created    : NE_str = Field( default_factory = get_now_utc_iso)
     time_received   : NE_str = Field( default_factory = get_now_utc_iso)
@@ -599,13 +597,11 @@ class AssistantMsg( AssistantContent, BasicMsg) :
     
     @classmethod
     def from_content( cls,
-                      origin  : str,
-                      case_id : int,
-                      content : AssistantContent ) -> "AssistantMsg" :
+                      origin  : str | None = None,
+                      content : AssistantContent | None = None ) -> "AssistantMsg" :
         
-        arguments = { "origin"  : origin,
-                      "case_id" : case_id,
-                      "text"    : content.text_out }
+        arguments = { "origin" : origin,
+                      "text"   : content.text_out }
         
         arguments.update( content.model_dump( exclude = {"text_out"}) )
         

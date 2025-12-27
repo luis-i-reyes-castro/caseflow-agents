@@ -301,7 +301,6 @@ class CaseHandlerBase(ABC) :
             
             msg = UserContentMsg(
                     origin          = _orig_,
-                    case_id         = self.case_id,
                     idempotency_key = message.id,
                     time_created    = unix_to_utc_iso(message.timestamp),
                     text            = text,
@@ -313,7 +312,6 @@ class CaseHandlerBase(ABC) :
             
             msg = UserInteractiveReplyMsg(
                     origin          = _orig_,
-                    case_id         = self.case_id,
                     idempotency_key = message.id,
                     time_created    = unix_to_utc_iso(message.timestamp),
                     choice          = message.interactive.choice )
