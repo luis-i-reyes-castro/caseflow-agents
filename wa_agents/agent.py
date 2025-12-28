@@ -5,6 +5,7 @@ Agent Class
 import os
 
 from base64 import b64encode
+from inspect import currentframe
 from mistralai import Mistral
 from openai import OpenAI
 from pydantic import BaseModel
@@ -22,8 +23,7 @@ from sofia_utils.io import ( extract_code_block,
 from sofia_utils.printing import ( print_recursively,
                                    print_sep )
 
-from .basemodels import ( AssistantContent,
-                          AssistantMsg,
+from .basemodels import ( AssistantMsg,
                           BasicMsg,
                           Message,
                           StructuredDataMsg,
@@ -157,12 +157,13 @@ class Agent :
     def get_response( self,
                       context : list[Message],
                       *,
+                      origin     : str | None = None,
                       load_imgs  : bool = False,
                       imgs_cache : dict[ str : bytes] = {},
-                      output_st  : str | Type | None = None,
+                      output_st  : str | Type[BaseModel] | None = None,
                       max_tokens : int | None = None,
                       debug      : bool = False
-                    ) -> AssistantContent | None :
+                    ) -> AssistantMsg | None :
         
         # If loading images then arguments must include images cache
         if load_imgs and not imgs_cache :
@@ -174,6 +175,7 @@ class Agent :
         
         # Call API and request response
         ag_resp_obj = self.call_openai_chat_completion( context    = context,
+                                                        origin     = origin,
                                                         load_imgs  = load_imgs,
                                                         imgs_cache = imgs_cache,
                                                         output_st  = output_st,
@@ -184,14 +186,16 @@ class Agent :
         if not ag_resp_obj :
             print_sep()
             print(f"In Agent get_response: No response received.")
+            return None
         elif ag_resp_obj.is_empty() :
             print_sep()
             print(f"In Agent get_response: Response received is empty.")
+            return None
         
         # Else apply post processing
-        elif ag_resp_obj.text_out :
+        if ag_resp_obj.text :
             for post_processor_ in self.post_processors :
-                ag_resp_obj.text_out = post_processor_(ag_resp_obj.text_out)
+                ag_resp_obj.text = post_processor_(ag_resp_obj.text)
         
         return ag_resp_obj
     
@@ -215,15 +219,23 @@ class Agent :
     def call_openai_chat_completion( self,
                                      context : list[Message],
                                      *,
+                                     origin     : str | None = None,
                                      load_imgs  : bool = False,
                                      imgs_cache : dict[ str : bytes] = {},
-                                     output_st  : str | Type | None = None,
+                                     output_st  : str | Type[BaseModel] | None = None,
                                      max_tokens : int | None = None,
                                      debug      : bool = False
-                                   ) -> AssistantContent | None :
+                                   ) -> AssistantMsg | None :
+        
+        # Determine message origin if not provided
+        origin = origin or f"{self.__class__.__name__}/{currentframe().f_code.co_name}"
         
         # Initialize API flag
         api_is_openrouter = ( self.api == "openrouter" )
+        
+        # ---------------------------------------------------------------------------------
+        # BEFORE API CALL: FORMAT CONTEXT
+        # ---------------------------------------------------------------------------------
         
         # Initialize list of messages
         messages : list[dict] = []
@@ -234,14 +246,14 @@ class Agent :
         
         # Populate messages from context
         for message in context :
+            
             # -----------------------------------------------------------------------------
-            # PROCESS TEXT AND/OR MEDIA
+            # CASE 1: BASIC MESSAGE SUBCLASS (I.E., MESSAGE WITH TEXT AND/OR MEDIA)
             if isinstance( message, BasicMsg) :
                 
                 # Prepare message header
                 msg = { "role" : message.role, "content" : [] }
                 
-                # -------------------------------------------------------------------------
                 # PROCESS TEXT
                 # Case of Basic Message
                 if isinstance( message, BasicMsg) and message.text :
@@ -258,7 +270,6 @@ class Agent :
                                                                indent = None) }
                     msg["content"].append(text_cb)
                 
-                # -------------------------------------------------------------------------
                 # PROCESS IMAGES
                 if isinstance( message, UserContentMsg) and message.media :
                     # Prepare placeholder text message
@@ -282,18 +293,15 @@ class Agent :
                     else :
                         msg["content"].append(text_cb)
                 
-                # -------------------------------------------------------------------------
                 # If using OpenRouter API and message is pure text then simplify
                 if api_is_openrouter \
                 and len(msg["content"]) == 1 \
                 and msg["content"][0]["type"] == "text" :
                     msg["content"] = msg["content"][0]["text"]
                 
-                # -------------------------------------------------------------------------
                 # INSERT MESSAGE WITH TEXT AND/OR IMAGE
                 messages.append(msg)
                 
-                # -------------------------------------------------------------------------
                 # PROCESS ASSISTANT MESSAGE TOOL CALLS
                 if isinstance( message, AssistantMsg) and message.tool_calls :
                     # Prepare message for tool calls
@@ -315,7 +323,7 @@ class Agent :
                     messages.append(msg)
             
             # -----------------------------------------------------------------------------
-            # PROCESS TOOL RESULTS MESSAGE
+            # CASE 2: TOOL RESULTS MESSAGE
             elif isinstance( message, ToolResultsMsg) and message.tool_results :
                 for tr in message.tool_results :
                     # Convert tool result content to JSON string if needed
@@ -325,8 +333,10 @@ class Agent :
                     messages.append( { "role"         : "tool",
                                        "content"      : tr.content,
                                        "tool_call_id" : tr.id } )
-            
-            # -----------------------------------------------------------------------------
+        
+        # ---------------------------------------------------------------------------------
+        # MAKE API CALL
+        # ---------------------------------------------------------------------------------
         
         # Prepare API response request parameters
         resp_req_parms = { "model"      : self.model,
@@ -387,32 +397,35 @@ class Agent :
         # Print debug info
         self.debug_print( "output", response) if debug else None
         
-        # ---------------------------------------------------------------------------------
-        # POST-PROCESSING: COLLECT RESPONSE TEXT AND TOOL CALLS
-        # Initialize agent response object
-        ag_resp_obj = AssistantContent()
-        
-        # Collect model and token usage
-        if response :
-            ag_resp_obj.agent = self.name
-            ag_resp_obj.api   = self.api
-            ag_resp_obj.model = getattr( response, "model", None)
-            usage = getattr( response, "usage", None)
-            if usage :
-                ag_resp_obj.tokens_input  = getattr( usage, "prompt_tokens", None)
-                ag_resp_obj.tokens_output = getattr( usage, "completion_tokens", None)
-                ag_resp_obj.tokens_total  = getattr( usage, "total_tokens", None)
-            
-            ag_resp_obj.instructions = self.prompts_merged
-            ag_resp_obj.tools        = self.tools
-            ag_resp_obj.context      = [ message.id for message in context ]
-            
-        else :
+        # If no response then return
+        if not response :
             return None
         
+        # ---------------------------------------------------------------------------------
+        # AFTER API CALL: COLLECT RESPONSE TEXT AND TOOL CALLS
+        # ---------------------------------------------------------------------------------
+        
+        # Initialize agent response object
+        ag_resp_obj = AssistantMsg(origin = origin)
+        
+        # Collect model and token usage
+        ag_resp_obj.agent = self.name
+        ag_resp_obj.api   = self.api
+        ag_resp_obj.model = getattr( response, "model", None)
+        usage = getattr( response, "usage", None)
+        if usage :
+            ag_resp_obj.tokens_input  = getattr( usage, "prompt_tokens", None)
+            ag_resp_obj.tokens_output = getattr( usage, "completion_tokens", None)
+            ag_resp_obj.tokens_total  = getattr( usage, "total_tokens", None)
+        
+        ag_resp_obj.instructions = self.prompts_merged
+        ag_resp_obj.tools        = self.tools
+        ag_resp_obj.context      = [ message.id for message in context ]
+        
         # Select first choice because it is the only one generated
-        if response and hasattr( response, "choices") \
+        if hasattr( response, "choices") \
         and isinstance( response.choices, list) and response.choices :
+            
             choice = response.choices[0]
             
             # Collect text
@@ -448,21 +461,23 @@ class Agent :
             
             # Collect structured output
             if output_st and issubclass( output_st, BaseModel) :
+                
                 parsed = getattr( choice.message, "parsed", None)
                 if parsed and isinstance( parsed, BaseModel) :
                     ag_resp_obj.st_output = parsed.model_dump()
                     ag_resp_obj.st_out_bm = parsed.__class__.__name__
-                else :
+                
+                elif ag_resp_obj.text :
                     try :
-                        text_out = extract_code_block(ag_resp_obj.text_out)
-                        ag_resp_obj.st_output = output_st.model_validate_json(text_out)
+                        code = extract_code_block(ag_resp_obj.text)
+                        ag_resp_obj.st_output = output_st.model_validate_json(code)
                         ag_resp_obj.st_out_bm = output_st.__name__
                     except Exception :
                         pass
             
             # If structured output was collected then clear text
             if ag_resp_obj.st_output :
-                ag_resp_obj.text_out = None
+                ag_resp_obj.text = None
         
         # ---------------------------------------------------------------------------------
         # The grand finale

@@ -537,13 +537,12 @@ class ServerInteractiveOptsMsg( ServerMsg, StructuredDataMsg) :
         return self.model_dump_json( include = { "header", "body", "options" })
 
 # -----------------------------------------------------------------------------------------
-# ASSISTANT CONTENT AND MESSAGES
+# ASSISTANT MESSAGES
 
-class AssistantContent(BaseModel) :
+class AssistantMsg(BasicMsg) :
     """
-    Assistant (AI/LLM) Content
+    Assistant (AI/LLM) Message
     """
-    text_out   : str | None = None
     tool_calls : Annotated[ list[ToolCall], Field( default_factory = list)]
     st_output  : dict | None = None
     st_out_bm  : str  | None = None
@@ -561,54 +560,22 @@ class AssistantContent(BaseModel) :
     def append_to_text( self, text_block : str | None) -> None :
         
         if text_block and isinstance( text_block, str): 
-            if not self.text_out :
-                self.text_out = text_block
+            if not self.text :
+                self.text = text_block
             else :
-                if self.text_out.endswith("\n") :
-                    self.text_out += ( "\n" + text_block )
+                if self.text.endswith("\n") :
+                    self.text += ( "\n" + text_block )
                 else :
-                    self.text_out += ( "\n\n" + text_block )
+                    self.text += ( "\n\n" + text_block )
         
         return
     
     def is_empty(self) -> bool :
-        return not bool( self.text_out or self.tool_calls or self.st_output )
-
-class AssistantMsg( AssistantContent, BasicMsg) :
-    """
-    Assistant (AI/LLM) Message
-    NOTE:
-    * Instantiate only via class method `from_content`
-    * Do not instantiate directly using class constructor
-    """
-    
-    @model_validator( mode = "after")
-    def ensure_nonempty(self) -> Self :
-        
-        if self.is_empty() :
-            e_msg = f"In {self.basemodel}: No text, tool calls or structured output."
-            raise ValidationError(e_msg)
-        
-        return self
+        return not bool( self.text or self.tool_calls or self.st_output )
     
     @property
     def role(self) -> str :
         return "assistant"
-    
-    @classmethod
-    def from_content( cls,
-                      origin  : str | None = None,
-                      content : AssistantContent | None = None ) -> "AssistantMsg" :
-        
-        arguments = { "origin" : origin,
-                      "text"   : content.text_out }
-        
-        arguments.update( content.model_dump( exclude = {"text_out"}) )
-        
-        return cls(**arguments)
-    
-    def is_empty(self) -> bool :
-        return not bool( self.text or self.tool_calls or self.st_output )
 
 # -----------------------------------------------------------------------------------------
 # TOOL RESULTS MESSAGES
