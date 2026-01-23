@@ -30,6 +30,11 @@ type HandlerJob = tuple[ WhatsAppMetaData, WhatsAppContact]
 class JobTimeDict( dict[ HandlerJob, float] ) :
     
     def get_due_now(self) -> list[HandlerJob] :
+        """
+        Return jobs scheduled for immediate response generation \\
+        Returns:
+            List of handler jobs whose response time has elapsed
+        """
         
         result = []
         for handlerjob, job_response_time in self.items() :
@@ -39,15 +44,29 @@ class JobTimeDict( dict[ HandlerJob, float] ) :
         return result
     
     def mark_as_done( self, job : HandlerJob) -> None :
+        """
+        Remove a job entry once its delayed response completes \\
+        Args:
+            job : Tuple of ( operator metadata, contact)
+        """
         self.pop( job, 0.0)
         return
 
 
 class QueueWorker :
+    """
+    Background worker that drains QueueDB and runs CaseHandler instances
+    """
     
     def __init__( self,
                   queue_db    : QueueDB,
                   handler_cls : Type[CaseHandlerBase]) -> None :
+        """
+        Configure the worker with its queue database and handler class \\
+        Args:
+            queue_db    : QueueDB instance
+            handler_cls : CaseHandlerBase subclass invoked per user/operator
+        """
         
         self.queue       = queue_db
         self.handler_cls = handler_cls
@@ -57,12 +76,18 @@ class QueueWorker :
         return
     
     def stop( self, *_ : object) -> None :
+        """
+        Signal the worker loop to exit gracefully
+        """
         
         self._stop_flag = True
         
         return
     
     def serve_forever( self) -> None :
+        """
+        Poll the queue database and schedule response jobs indefinitely
+        """
         
         logging.info( "Queue worker started, poll interval = %ss", POLL_INTERVAL_IDLE)
         
@@ -82,6 +107,11 @@ class QueueWorker :
         return
     
     def _process_payload( self) -> bool :
+        """
+        Claim and process a single queue payload \\
+        Returns:
+            True if a payload was processed; False if queue empty.
+        """
         
         item = self.queue.claim_next()
         if not item :
@@ -136,6 +166,13 @@ class QueueWorker :
         return True
     
     def _process_jobs( self, jobs_to_process : list[HandlerJob]) -> bool :
+        """
+        Run delayed assistant responses for the provided jobs \\
+        Args:
+            jobs_to_process : Jobs ready to generate responses
+        Returns:
+            True if at least one job finished; else False.
+        """
         
         processed_jobs = False
         try :

@@ -12,15 +12,18 @@ from phonenumbers.geocoder import description_for_number as ph_num_description
 
 def get_country_and_language( phone_number : str) -> dict[ str : str] :
     """
-    Input:  phone number with or without '+' but with no spaces
-    Output: dict with:
-        - code_region     : region code
-        - code_language   : native language code
-        - country_en      : country name in English
-        - country_native  : country name in native language
-        - language_en     : native language name in English
-        - language_native : native language name in its own language
-        - US_state        : US state (only for US)
+    Derive country and language metadata from a raw phone number \\
+    Args:
+        phone_number : Number with or without '+' (must not contain spaces)
+    Returns:
+        Dict with fields:
+            `code_region`     : region code
+            `code_language`   : native language code
+            `country_en`      : country name in English
+            `country_native`  : country name in native language
+            `language_en`     : native language name in English
+            `language_native` : native language name in its own language
+            `US_state`        : US state (only for US)
     """
     result = {}
     try :

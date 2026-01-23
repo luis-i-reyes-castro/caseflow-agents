@@ -15,6 +15,11 @@ class QueueDB :
     """
     
     def __init__( self, db_path : str | Path) -> None :
+        """
+        Initialize the queue database (creating schema if needed) \\
+        Args:
+            db_path : Path to the SQLite database file
+        """
         
         self._db_path = Path(db_path)
         self._lock    = threading.Lock()
@@ -24,7 +29,9 @@ class QueueDB :
     
     def _connect(self) -> sqlite3.Connection :
         """
-        Connect to database
+        Connect to the queue database file \\
+        Returns:
+            SQLite connection configured with row factory
         """
         conn             = sqlite3.connect( self._db_path, timeout = 30)
         conn.row_factory = sqlite3.Row
@@ -33,7 +40,7 @@ class QueueDB :
     
     def _init_db(self) -> None :
         """
-        Initialize database
+        Create the queue tables and indexes when missing
         """
         with self._connect() as conn :
             conn.execute(
@@ -63,11 +70,11 @@ class QueueDB :
     
     def enqueue( self, payload : WhatsAppPayload) -> bool :
         """
-        Insert a payload if not already present.\n
+        Insert a payload only if it has not been seen before \\
         Args:
-            payload: Object of class WhatsAppPayload
+            payload : WhatsAppPayload object to enqueue
         Returns:
-            True if enqueued, False otherwise.
+            True if the payload was enqueued; False if it was a duplicate.
         """
         with self._lock, self._connect() as conn :
             try :
@@ -86,9 +93,9 @@ class QueueDB :
     
     def claim_next(self) -> dict[ str, str | WhatsAppPayload] | None :
         """
-        Atomically claim the next pending payload\n
+        Atomically claim the oldest pending payload \\
         Returns:
-            Dict with keys: 'row_id', 'payload'
+            Dict with keys `row_id` and `payload`, or None if queue empty.
         """
         with self._lock, self._connect() as conn :
             
@@ -126,9 +133,9 @@ class QueueDB :
     
     def mark_done( self, row_id : int) -> None :
         """
-        Mark payload as done.\n
+        Mark a queue row as processed successfully \\
         Args:
-            row_id: Row ID of the payload
+            row_id : Queue row identifier
         """
         with self._connect() as conn :
             conn.execute(
@@ -144,10 +151,10 @@ class QueueDB :
     
     def mark_error( self, row_id : int, error_msg : str) -> None :
         """
-        Mark error during payload processing.\n
+        Mark a queue row as failed and store the error message \\
         Args:
-            row_id    : Row ID of the payload
-            error_msg : Error message
+            row_id    : Queue row identifier
+            error_msg : Error details to persist
         """
         with self._connect() as conn :
             conn.execute(

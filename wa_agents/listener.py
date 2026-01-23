@@ -15,8 +15,17 @@ from .queue_db import QueueDB
 
 
 class Listener(Flask) :
+    """
+    Minimal Flask app that validates and enqueues WhatsApp webhooks
+    """
     
     def __init__( self, import_name : str, queue_db : QueueDB) -> None :
+        """
+        Initialize the listener with its import name and queue backend \\
+        Args:
+            import_name : Flask import name
+            queue_db    : QueueDB instance used to enqueue payloads
+        """
         
         super().__init__(import_name)
         self.queue_db = queue_db
@@ -27,6 +36,9 @@ class Listener(Flask) :
         return
     
     def register_routes(self) -> None :
+        """
+        Register health, verification, and webhook endpoints
+        """
         # ---------------------------------------------------------------------------------
         # Diagnostic functions
         

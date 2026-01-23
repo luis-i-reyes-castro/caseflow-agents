@@ -23,6 +23,13 @@ WA_TOKEN = os.getenv("WA_TOKEN")
 # MESSAGES: INCOMING
 
 def fetch_media( media_data : WhatsAppMediaData) -> bytes :
+    """
+    Download WhatsApp media content using its media id \\
+    Args:
+        media_data : WhatsApp media metadata payload
+    Returns:
+        Raw media bytes
+    """
     
     result = None
     
@@ -45,6 +52,13 @@ def fetch_media( media_data : WhatsAppMediaData) -> bytes :
 # MESSAGES: OUTGOING
 
 def write_headers( content_type : bool = False) -> dict :
+    """
+    Compose Graph API headers with auth and optional JSON content-type \\
+    Args:
+        content_type : When True, include `Content-Type: application/json`
+    Returns:
+        Headers dictionary for requests
+    """
     
     headers = { "Authorization": f"Bearer {WA_TOKEN}" }
     if content_type :
@@ -55,6 +69,14 @@ def write_headers( content_type : bool = False) -> dict :
 def write_payload( to_number : str,
                    content   : str | ServerInteractiveOptsMsg | OutgoingMediaMsg
                  ) -> dict[ str, Any] :
+    """
+    Serialize outgoing text/interactive/media messages \\
+    Args:
+        to_number : WhatsApp recipient phone number
+        content   : Text, interactive options, or media payload
+    Returns:
+        Dictionary ready to send to the Graph API.
+    """
     
     payload = { "messaging_product" : "whatsapp",
                 "to"                : to_number }
@@ -123,6 +145,13 @@ def write_payload( to_number : str,
 def send_whatsapp_text( operator_id : str,
                         to_number   : str,
                         text        : str ) -> None :
+    """
+    Send a text-only WhatsApp message \\
+    Args:
+        operator_id : Business phone-number id
+        to_number   : Recipient phone number
+        text        : Message body
+    """
     
     # 1) Declare message URL and headers
     msg_url     = f"{API_URL}{operator_id}/messages"
@@ -139,6 +168,13 @@ def send_whatsapp_text( operator_id : str,
 def send_whatsapp_interactive( operator_id : str,
                                to_number   : str,
                                message     : ServerInteractiveOptsMsg ) -> None :
+    """
+    Send WhatsApp interactive responses (buttons/lists) \\
+    Args:
+        operator_id : Business phone-number id
+        to_number   : Recipient phone number
+        message     : Interactive options payload
+    """
     
     # 1) Declare message URL and headers
     msg_url     = f"{API_URL}{operator_id}/messages"
@@ -155,6 +191,15 @@ def send_whatsapp_interactive( operator_id : str,
 def send_whatsapp_media( operator_id : str,
                          to_number   : str,
                          media       : OutgoingMediaMsg ) -> bool :
+    """
+    Upload media and send it to the given WhatsApp number \\
+    Args:
+        operator_id : Business phone-number id
+        to_number   : Recipient phone number
+        media       : OutgoingMediaMsg describing the file to send
+    Returns:
+        True if upload/send succeeded; else False.
+    """
     
     # Reference: https://developers.facebook.com/docs/whatsapp/cloud-api/reference/media/
     
@@ -220,12 +265,11 @@ def send_whatsapp_media( operator_id : str,
 def markdown_to_whatsapp( markdown_text : str) -> str :
     
     """
-    Convert markdown formatting to WhatsApp formatting.
-    Works with bolds, italics and headings.
+    Convert markdown formatting to WhatsApp formatting \\
     Args:
-        markdown_text: Markdown text
-    Returns
-        Text converted to WhatsApp format
+        markdown_text : Markdown text to transform
+    Returns:
+        Text adjusted for WhatsApp-supported markup
     """
     
     # Convert markdown bold to WhatsApp bold
