@@ -31,15 +31,26 @@ from .phone_numbers import get_country_and_language
 # COMMON TYPES AND BASEMODELS
 # =========================================================================================
 
-type NN_Decimal  = Annotated[ Decimal, Field( ge = 0)]
-type NN_int      = Annotated[ int,     Field( ge = 0)]
-type NE_str      = Annotated[ str,     Field( min_length = 2)]
-type NE_list_str = Annotated[ list[ NE_str ],     Field( min_length = 1)]
+type NN_Decimal = Annotated[ Decimal, Field( ge = 0)]
+""" Non-negative Decimal """
+
+type NN_int = Annotated[ int, Field( ge = 0)]
+""" Non-negative integer """
+
+type NE_str = Annotated[ str, Field( min_length = 2)]
+""" Non-empty string (at least 2 chars) """
+
+type NE_list_str = Annotated[ list[ NE_str ], Field( min_length = 1)]
+""" Non-empty list of strings (at least 1 string) """
+
 type NE_dict_str = Annotated[ dict[ NE_str, Any], Field( min_length = 1)]
+""" Non-empty dict of strings (at least 1 key-value pair) """
 
 class InteractiveOption(BaseModel) :
     """
     Interactive Message Option
+        `id`    : "<option ID>"
+        `title` : "<option title>"
     """
     id    : NE_str
     title : NE_str
@@ -249,15 +260,13 @@ class WhatsAppPayload(BaseModel) :
 
 class UserData(BaseModel) :
     """
-    User Data
-    {
-    "user_id"  : "<user_id>"
-    "code_reg" : "<region code>" | null
-    "code_lan" : "<language code>" | null
-    "country"  : "<country>" | null
-    "language" : "<language>" | null
-    "name"     : "<name>" | null
-    }
+    User data class
+        `user_id`  : "<user_id>"
+        `code_reg` : "<region code>" | null
+        `code_lan` : "<language code>" | null
+        `country`  : "<country>" | null
+        `language` : "<language>" | null
+        `name`     : "<name>" | null
     """
     user_id  : NE_str
     code_reg : NE_str | None = None
@@ -282,15 +291,14 @@ class UserData(BaseModel) :
 
 class Message( BaseModel, ABC) :
     """
-    Message abstract base class. Must implement abstract property `role`.
-    {
-    "basemodel"       : "<class name (for deserialization)>"
-    "origin"          : "<optional field for tracking purposes>" | null
-    "idempotency_key" : "<provider message ID>",
-    "time_created"    : "<timestamp>"
-    "time_received"   : "<timestamp>"
-    "id"              : "<timestamp>_<random B62 8-char string>" | null
-    }
+    Message abstract base class. \\
+    Must implement abstract property `role`.
+        `basemodel`       : "<class name (for deserialization)>"
+        `origin`          : "<optional field for tracking purposes>" | null
+        `idempotency_key` : "<provider message ID>",
+        `time_created`    : "<timestamp>"
+        `time_received`   : "<timestamp>"
+        `id`              : "<timestamp>_<random B62 8-char string>" | null
     """
     basemodel       : NE_str | None = None
     origin          : NE_str | None = None
@@ -301,7 +309,7 @@ class Message( BaseModel, ABC) :
     
     def model_post_init( self, __context : Any) -> None :
         """
-        * Populate basemodel and id
+        Populate fields `basemodel` and `id`
         """
         self.basemodel = self.__class__.__name__
         
@@ -316,10 +324,11 @@ class Message( BaseModel, ABC) :
         return
     
     def print(self) -> None :
-        
+        """
+        Print itself
+        """
         print_sep()
         print( "[INFO] Message:\n" + self.model_dump_json( indent= JSON_INDENT) )
-        
         return
     
     @property
@@ -329,13 +338,14 @@ class Message( BaseModel, ABC) :
 
 class BasicMsg( Message, ABC) :
     """
-    Basic Message abstract base class. Has field `text`.
+    Basic Message abstract base class. \\
+    Has field `text`.
     """
     text : str | None = None
 
 class StructuredDataMsg( Message, ABC) :
     """
-    Structured Data Message abstract base class.
+    Structured Data Message abstract base class. \\
     Must implement abstract method `as_text`.
     """
     @abstractmethod
@@ -348,9 +358,7 @@ class StructuredDataMsg( Message, ABC) :
 class MediaBase( BaseModel, ABC) :
     """
     Media (Abstract Base Class)
-    {
-    "mime" : "<MIME type>"
-    }
+        `mime` : "<MIME type>"
     """
     mime : NE_str
     
@@ -365,20 +373,16 @@ class MediaBase( BaseModel, ABC) :
 class MediaContent(MediaBase) :
     """
     Media Content
-    {
-    "content" :  <bytes>
-    }
+        `content` :  <bytes>
     """
     content : bytes
 
 class MediaData(MediaBase) :
     """
     Media Data
-    {
-    "name"   : "<filename>_<index>.<extension>",
-    "sha256" : "<hash of attachment content>" | null,
-    "size"   :  <attachment size> | null
-    }
+        `name`   : "<filename>_<index>.<extension>",
+        `sha256` : "<hash of attachment content>" | null,
+        `size`   :  <attachment size> | null
     """
     name   : NE_str
     sha256 : NE_str | None = None
@@ -386,13 +390,22 @@ class MediaData(MediaBase) :
     
     @classmethod
     def from_content( cls, media_content : MediaContent) -> "MediaData" :
-        
+        """
+        Instantiate a `MediaData` object from a `MediaContent` object
+        """
         return cls( name   = cls.__class__.__name__,
                     mime   = media_content.mime,
                     sha256 = get_sha256(media_content.content),
                     size   = len(media_content.content) )
 
 def load_media( path : str | Path) -> tuple[ MediaData, MediaContent] :
+    """
+    Load a media file from disk and produce matching Media models \\
+    Args:
+        path : Filesystem path to the media file
+    Returns:
+        Tuple of ( MediaData, MediaContent); each element may be None if invalid.
+    """
     
     media_path = Path(path)
     media_mime = guess_type(media_path.name)[0]
@@ -423,11 +436,9 @@ class OutgoingMediaMsg(MediaBase) :
 class ToolCall(BaseModel) :
     """
     Tool Call
-    {
-    "id"    : "<tool call ID>",
-    "name"  : "<tool name>" | null,
-    "input" :  <tool input object as per schema> | null
-    }
+        `id`    : "<tool call ID>",
+        `name`  : "<tool name>" | null,
+        `input` :  <tool input object as per schema> | null
     """
     id    : NE_str = Field( default_factory = generate_UUID)
     name  : NE_str = Field( default = "tool_name")
@@ -436,11 +447,9 @@ class ToolCall(BaseModel) :
 class ToolResult(BaseModel) :
     """
     Tool Result
-    {
-    "id"      : "<tool call ID>",
-    "content" : "<tool call result>" | null,
-    "error"   : false | true | null
-    }
+        `id`      : "<tool call ID>",
+        `content` : "<tool call result>" | null,
+        `error`   : false | true | null
     """
     id      : NE_str
     content : Any  | None = None
@@ -597,24 +606,20 @@ class ToolResultsMsg(Message) :
 class CaseIndex(BaseModel) :
     """
     Open Case Index
-    {
-    "open_case_id" : <case ID>
-    }
+        `open_case_id` : <case ID>
     """
     open_case_id : NN_int | None = None
 
 class CaseManifest(BaseModel) :
     """
     Manifest
-    {
-    "case_id"           : <case ID>,
-    "model"             : "T40" | "T50" | null
-    "status"            : "open" | "resolved" | "timeout",
-    "time_opened"       : "<timestamp>",
-    "time_last_message" : "<timestamp>" | null,
-    "time_closed"       : "<timestamp>" | null,
-    "message_ids"       : [ "<message ID>", ... ],
-    }
+        `case_id`           : <case ID>,
+        `model`             : "T40" | "T50" | null
+        `status`            : "open" | "resolved" | "timeout",
+        `time_opened`       : "<timestamp>",
+        `time_last_message` : "<timestamp>" | null,
+        `time_closed`       : "<timestamp>" | null,
+        `message_ids`       : [ "<message ID>", ... ],
     """
     case_id           : NN_int
     model             : NE_str | None = None
@@ -630,6 +635,12 @@ class CaseManifest(BaseModel) :
 
 def print_validation_errors( validation_error : ValidationError,
                              indent           : int = JSON_INDENT) -> None :
+    """
+    Pretty-print pydantic validation errors with indentation \\
+    Args:
+        validation_error : ValidationError object raised by pydantic
+        indent           : Indentation level when printing
+    """
     
     for error in validation_error.errors() :
         
